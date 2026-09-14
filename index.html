@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Wipe Check</title>
+<meta name="description" content="A three-role party roguelite. Tank, DPS and healer against endless waves, with a real threat table.">
+<meta name="theme-color" content="#0E1017">
+<link rel="icon" href="assets/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Cinzel:wght@600;800&display=swap">
+<link rel="stylesheet" href="styles/game.css">
+</head>
+<body>
+<div class="app">
+  <div class="arena" id="arena">
+    <canvas id="cv"></canvas>
+    <div class="enrage" id="enrage"><i></i></div>
+    <div class="stagelbl" id="stagelbl"></div>
+    <div class="objective" id="objective">
+      <div class="keys" id="keySockets" title="Key fragments"><i></i><i></i><i></i></div>
+      <div class="horde" id="horde" title="The horde"><b></b><b></b><b></b><b></b><b class="last"></b><span>Horde</span></div>
+    </div>
+    <div class="bosshp" id="bosshp"><div class="nm" id="bossnm"></div><div class="bar"><i style="background:#D9463E"></i></div></div>
+
+    <div class="achtoast" id="achToast"></div>
+
+    <!-- the HUD: everything that used to sit around the arena now sits on it -->
+    <div class="hud" id="hud">
+      <div class="frames" id="frames"></div>
+      <div class="runbar">
+        <div class="stat"><div class="k">Stage</div><div class="v" id="sStage">&mdash;</div></div>
+        <div class="stat"><div class="k">Kills</div><div class="v" id="sKills">0</div></div>
+        <div class="stat"><div class="k">Best</div><div class="v" id="sBest">&mdash;</div></div>
+        <button class="tog" id="btnGear" title="Gear (G)">Gear <b>G</b></button>
+        <button class="tog" id="btnPause" title="Menu (Esc)">Menu <b>Esc</b></button>
+      </div>
+      <div class="bot">
+        <div class="abil" id="abilBox"><div class="nm" id="abilNm">&mdash;</div><div class="k">Space</div><div class="cool" id="abilCool"></div></div>
+        <div class="xpwrap">
+          <div class="xphead"><span>Party level <b id="xpLvl">1</b></span><span><b id="xpNum">0/8</b> XP</span></div>
+          <div class="xpbar"><i id="xpFill"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <section class="veil" id="vMenu">
+      <div class="brand">
+        <div class="wordmark">Wipe <em>Check</em></div>
+        <div class="tagline">Three-man roguelite &middot; hold threat or die</div>
+        <div class="clearedmark">Vault cleared</div>
+        <div class="build" id="buildTag">dev build</div>
+      </div>
+      <h2>Pick your seat</h2>
+      <div class="sub">The other two run on party AI &middot; swap any time</div>
+      <div class="roles" id="rolePick"></div>
+      <p class="brief">Everyone auto-attacks. You only steer &mdash; and press one button. Enemies pick targets off a <b>threat table</b>: the tank's aura holds them, damage pulls them, and <b>healing pulls them hardest of all</b>. Let the healer out-threat the tank and the run ends fast.</p>
+      <div class="keys">
+        <span><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> move</span>
+        <span><span class="kbd">Space</span> ability</span>
+        <span><span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span> swap seat</span>
+        <span><span class="kbd">Esc</span> menu</span>
+        <span><span class="kbd">F</span> fullscreen</span>
+      </div>
+      <div class="ctarow">
+        <button class="cta" id="btnPull">Pull</button>
+        <button class="cta ghost" id="btnOnline">Play online</button>
+        <button class="cta ghost" id="btnFullMenu">Fullscreen</button>
+        <button class="cta ghost" id="btnTrophies">Trophies</button>
+      </div>
+      <div class="hint" id="hint">Drag on the arena to move on touch &middot; turn your phone sideways for the full view</div>
+    </section>
+
+    <section class="veil" id="vOnline" hidden>
+      <h2>Play online</h2>
+      <div class="sub">One of you hosts &middot; the rest join with the code &middot; empty seats run on party AI</div>
+      <div class="lobby" id="onEntry">
+        <label class="lrow"><span class="setk">Your name</span><input id="onName" maxlength="12" placeholder="Player" autocomplete="off" spellcheck="false"></label>
+        <div class="lrow"><button class="cta" id="btnHost">Host a room</button></div>
+        <div class="lor">or</div>
+        <div class="lrow"><input id="onCode" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="cta ghost" id="btnJoin">Join</button></div>
+      </div>
+      <div class="lobby" id="onRoom" hidden>
+        <div class="roomcode">Room <b id="onCodeBig">----</b></div>
+        <div class="roles seats" id="onSeats"></div>
+        <div class="players" id="onPlayers"></div>
+      </div>
+      <div class="onstatus" id="onStatus"></div>
+      <div class="ctarow">
+        <button class="cta" id="btnOnlinePull" hidden>Pull</button>
+        <button class="cta ghost" id="btnOnlineBack">Back</button>
+      </div>
+    </section>
+
+    <section class="veil hold" id="vHold" hidden>
+      <h2 id="holdTtl">Host paused</h2>
+      <div class="sub" id="holdSub">Waiting for the host</div>
+    </section>
+
+    <section class="veil" id="vLevel" hidden>
+      <h2 id="lvlTtl">Party level 2</h2>
+      <div class="sub" id="lvlSub">Rolling&hellip;</div>
+      <div class="reels" id="lvlCards"></div>
+    </section>
+
+    <section class="veil" id="vRelic" hidden>
+      <h2>Relic chest</h2>
+      <div class="sub" id="relicSub">Rolling&hellip;</div>
+      <div class="reels one" id="relicReel"></div>
+      <div class="deltas held" id="relicHeld"></div>
+      <div class="ctarow" id="relicTake"></div>
+    </section>
+
+    <section class="veil" id="vLoot" hidden>
+      <h2>Loot</h2>
+      <div class="sub" id="lootSub">Master looter &mdash; assign one drop</div>
+      <div class="cards" id="lootCards"></div>
+      <div class="takebox" id="lootTake"></div>
+    </section>
+
+    <section class="veil" id="vGear" hidden>
+      <h2>Party gear</h2>
+      <div class="sub">Five slots each &middot; weapons are role-locked</div>
+      <div class="gearwrap" id="gearBody"></div>
+      <div class="ctarow"><button class="cta ghost" id="btnGearClose">Close</button></div>
+    </section>
+
+    <section class="veil" id="vTrophies" hidden>
+      <h2>Trophies</h2>
+      <div class="sub"><span id="trophyCount">0 / 10</span> &middot; they stay earned between runs</div>
+      <div class="trophies" id="trophyBody"></div>
+      <div class="ctarow"><button class="cta ghost" id="btnTrophiesClose">Close</button></div>
+    </section>
+
+    <section class="veil" id="vOver" hidden>
+      <div class="brand small"><div class="wordmark">Wipe <em>Check</em></div></div>
+      <h2 id="overTtl">Wipe</h2>
+      <div class="sub" id="overSub"></div>
+      <div class="tally" id="overTally"></div>
+      <div class="endach" id="overAch"></div>
+      <div class="endloot" id="overLoot"></div>
+      <div class="sub" id="overWait" hidden>Waiting for the host</div>
+      <div class="ctarow">
+        <button class="cta" id="btnAgain">Pull again</button>
+        <button class="cta ghost" id="btnRole">Change seat</button>
+        <button class="cta ghost" id="btnOverLeave" hidden>Leave room</button>
+      </div>
+    </section>
+
+    <section class="veil" id="vPause" hidden>
+      <h2>Paused</h2>
+      <div class="sub">Esc or P to resume</div>
+      <div class="settings">
+        <div class="setrow">
+          <span class="setk">Sound</span>
+          <button class="tog" id="btnMute">Sound on</button>
+        </div>
+        <div class="mixer">
+          <label for="volMusic">Music</label>
+          <input type="range" id="volMusic" min="0" max="100" step="1" value="80" aria-label="Music volume">
+          <label for="volSfx">SFX</label>
+          <input type="range" id="volSfx" min="0" max="100" step="1" value="100" aria-label="Effects volume">
+        </div>
+        <div class="setrow">
+          <span class="setk">Display</span>
+          <button class="tog" id="btnFull">Fullscreen <b>F</b></button>
+        </div>
+      </div>
+      <div class="ctarow">
+        <button class="cta" id="btnResume">Resume</button>
+        <button class="cta ghost" id="btnPauseGear">Gear <b>G</b></button>
+        <button class="cta ghost" id="btnQuit">Quit to menu</button>
+      </div>
+    </section>
+  </div>
+</div>
+<script src="vendor/peerjs.min.js"></script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

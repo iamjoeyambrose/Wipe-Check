@@ -1,0 +1,20 @@
+{
+  "name": "wipe-check",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A three-role party roguelite - tank, DPS and healer against endless waves, on a real threat table.",
+  "type": "module",
+  "scripts": {
+    "start": "node build/serve.mjs",
+    "build": "node build/bundle.mjs",
+    "check": "node --check-all 2>/dev/null || node build/bundle.mjs --out /tmp/wipe-check-check.html",
+    "test": "node --test tests/*.mjs",
+    "broker": "peerjs --port 9000 --host 127.0.0.1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "peer": "^1.0.2"
+  }
+}

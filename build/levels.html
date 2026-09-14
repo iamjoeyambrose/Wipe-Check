@@ -1,0 +1,42 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Wipe Check · sound levels</title>
+<style>
+ body{background:#12151E;color:#E7EAF2;font:13px/1.5 ui-monospace,Menlo,monospace;padding:24px;margin:0}
+ h1{font:600 15px/1.3 system-ui;letter-spacing:.06em;text-transform:uppercase;color:#E8C46A}
+ p{color:#98A0B5;max-width:64ch;font-family:system-ui;font-size:13px}
+ table{border-collapse:collapse;margin-top:14px}
+ td,th{padding:2px 14px 2px 0;text-align:right}
+ th{color:#646D85;font-weight:600;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+ td:first-child,th:first-child{text-align:left;color:#E7EAF2}
+ .hot{color:#FF8A80}.ok{color:#6EE7A0}.low{color:#98A0B5}
+ button{font:inherit;background:#E8C46A;color:#15100A;border:0;border-radius:3px;padding:8px 18px;cursor:pointer}
+</style>
+<h1>Sound levels</h1>
+<p>Renders every cue offline and measures it, so the mix is verified rather than
+guessed. Peak should stay under &minus;1 dBFS everywhere. The music bed should sit
+below the impacts &mdash; that is what lets a slam cut through the track.</p>
+<p><button id="go">Measure</button></p>
+<div id="out"></div>
+<script type="module">
+import { sfx, audioRender, musicStart, musicIntensity, musicBoss, musicPrime } from '../src/audio.js';
+const LONG={wipe:2.6,win:2.6,bossHit:2.6,bene:2.2,rez:1.8,down:1.6,stage:2.0,lootEpic:1.8,loot:1.4};
+const NAMES=['click','reel','hit','swing','bow','hurt','smite','equip','volley','cleave','crit',
+ 'heal','rez','loot','enrage','levelup','bene','stage','down','lootEpic','shock','jackpot',
+ 'lock','wipe','win','bossHit'];
+document.getElementById('go').onclick=async()=>{
+  const rows=[];
+  for(const n of NAMES){
+    const r=await audioRender(()=>sfx(n,{gap:0}),LONG[n]||1.4);
+    rows.push([n,r.peak,r.rms]);
+  }
+  for(const [k,i,boss] of [['music L0',0,false],['music L1',1,false],['music L2',2,false],['music boss',2,true]]){
+    const r=await audioRender(()=>{musicIntensity(i);musicBoss(boss);musicStart();musicPrime(4.2)},4.4);
+    rows.push([k,r.peak,r.rms]);
+  }
+  musicBoss(false);
+  const cls=(p)=>p>-1?'hot':p<-30?'low':'ok';
+  document.getElementById('out').innerHTML='<table><tr><th>cue</th><th>peak dBFS</th><th>rms dBFS</th></tr>'+
+    rows.map(([n,p,r])=>`<tr><td>${n}</td><td class="${cls(p)}">${p}</td><td>${r}</td></tr>`).join('')+'</table>';
+};
+</script>
