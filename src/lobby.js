@@ -115,7 +115,18 @@ async function joinClick() {
   setStatus('Joining ' + code + '…'); $('btnJoin').disabled = true;
   /* a placeholder until the host's first 'lobby' lands -- it can beat the handshake's promise */
   lob = { seats: { tank: 'host', dps: 'bot', heal: 'bot' }, names: {} };
-  try { await joinRoom(code, { name: myName() }); } catch (e) { $('btnJoin').disabled = false; netLeave(); lob = null; setStatus('No room called ' + code); return; }
+  try {
+    await joinRoom(code, { name: myName() }, (stage) => {
+      if (stage === 'broker') setStatus('Looking for room ' + code + '…');
+      if (stage === 'found') setStatus('Found it — connecting to the host…');
+    });
+  } catch (e) {
+    $('btnJoin').disabled = false; netLeave(); lob = null;
+    if (e && e.kind === 'route') setStatus('Found the room, but your networks would not connect. Try again, or one of you switch to a phone hotspot.');
+    else if (e && e.kind === 'noroom') setStatus('No room called ' + code + ' — check the letters, and that the host is still on the room screen');
+    else setStatus('Could not reach the matchmaker — check your connection');
+    return;
+  }
   $('btnJoin').disabled = false;
   showRoom(); setStatus('Waiting for the host to pull');
 }

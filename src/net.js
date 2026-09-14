@@ -13,11 +13,23 @@ const ALPHA = 'BCDFGHJKLMNPQRSTVWXZ';
 let peer = null, conns = [], hostConn = null, role = 'solo', myId = null, code = null;
 const handlers = {};
 
+/* STUN finds a direct route between two browsers; when both sit behind
+   strict routers there is none, and the TURN relays carry the traffic
+   instead. Without them a join across the internet can simply never open. */
+const ICE = { iceServers: [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  { urls: 'stun:openrelay.metered.ca:80' },
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+], sdpSemantics: 'unified-plan' };
+const JOIN_TIMEOUT = 20000;
+
 function brokerOpts() {
   const m = /[?&]peer=([^&]+)/.exec(location.search);
-  if (!m) return { debug: 0 };
+  if (!m) return { debug: 0, config: ICE };
   const parts = decodeURIComponent(m[1]).split(':');
-  return { host: parts[0], port: +parts[1] || 9000, path: '/', secure: false, debug: 0 };
+  return { host: parts[0], port: +parts[1] || 9000, path: '/', secure: false, debug: 0, config: ICE };
 }
 function newCode() { let s = ''; for (let i = 0; i < 4; i++) s += ALPHA[Math.floor(Math.random() * ALPHA.length)]; return s; }
 
@@ -78,25 +90,34 @@ function hostRoom() {
   });
 }
 
-function joinRoom(c4, meta) {
+/* `onStage` hears 'broker' (reached the matchmaker) and 'found' (the room
+   exists, the browsers are now trying to reach each other) */
+function joinRoom(c4, meta, onStage) {
   return new Promise((res, rej) => {
     if (typeof Peer === 'undefined') { rej(new Error('PeerJS not loaded')); return; }
     peer = new Peer(brokerOpts());
     role = 'guest';
-    let settled = false;
+    let settled = false, found = false;
     const fail = (e) => { if (!settled) { settled = true; rej(e); } };
     peer.on('open', (id) => {
       myId = id;
+      if (onStage) onStage('broker');
       const c = peer.connect('wc-' + String(c4).toUpperCase(), { reliable: true, metadata: meta || {} });
       hostConn = c;
       /* listen before 'open': the host's first message can land ahead of the
          channel's own open event on the side that dialled */
       wire(c);
+      c.on('iceStateChanged', (st) => { if (!found && (st === 'checking' || st === 'connected')) { found = true; if (onStage) onStage('found'); } });
       c.on('open', () => { c.__opened = true; conns = [c]; settled = true; code = String(c4).toUpperCase(); send(c, { t: 'hello', meta: meta || {} }); res(code); });
       c.on('error', fail);
-      setTimeout(() => fail(new Error('No room with that code')), 8000);
+      setTimeout(() => fail(Object.assign(new Error(found ? 'Found the room but the connection never opened' : 'No room with that code'), { kind: found ? 'route' : 'noroom' })), JOIN_TIMEOUT);
     });
-    peer.on('error', (e) => { fail(e); emit('error', e); });
+    peer.on('error', (e) => {
+      /* the matchmaker says there is no such id: fail at once, not after the timeout */
+      if (e && e.type === 'peer-unavailable') fail(Object.assign(new Error('No room with that code'), { kind: 'noroom' }));
+      else fail(e);
+      emit('error', e);
+    });
   });
 }
 
